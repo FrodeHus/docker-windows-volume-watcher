@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"os/exec"
@@ -12,8 +13,14 @@ import (
 )
 
 var watcher *fsnotify.Watcher
+var container string
+
+func init() {
+	flag.StringVar(&container, "container", "radix-web-dev_container", "Name of the container instance that you wish to notify of filesystem changes")
+}
 
 func main() {
+	flag.Parse()
 	watcher, _ = fsnotify.NewWatcher()
 	defer watcher.Close()
 
@@ -43,22 +50,21 @@ func notifyDocker(event fsnotify.Event) {
 	if event.Op != fsnotify.Write {
 		return
 	}
+	file := filepath.ToSlash(event.Name)
 
-	result, err := exec.Command("docker", "exec", "radix-web-dev_container", "stat", "-c", "%a", event.Name).Output()
-	if strings.Contains(event.Name, ".git") {
-		return
-	}
+	fmt.Println(fmt.Sprintf("%s: %s", event.Op, file))
+
+	result, err := exec.Command("docker", "exec", container, "stat", "-c", "%a", file).Output()
 
 	perms, err := strconv.Atoi(strings.TrimSuffix(string(result), "\n"))
 	if err != nil {
 		fmt.Println("Failed to convert permissions: ", err)
 		return
 	}
-	_, err = exec.Command("docker", "exec", "radix-web-dev_container", "/bin/sh", "-c", fmt.Sprintf("chmod %d %s", perms, event.Name)).Output()
+	_, err = exec.Command("docker", "exec", container, "/bin/sh", "-c", fmt.Sprintf("chmod %d %s", perms, file)).Output()
 	if err != nil {
 		fmt.Printf("Error notifying container about file change: %v", err)
 	}
-	fmt.Println(fmt.Sprintf("%s: %s", event.Op, event.Name))
 }
 
 func watchDir(path string, fi os.FileInfo, err error) error {
