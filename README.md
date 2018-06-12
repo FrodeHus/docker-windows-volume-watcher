@@ -7,4 +7,4 @@ Inspired by [Mikhail Erofeev's Python tool](https://github.com/merofeev/docker-w
 _Usage_:
 Run this tool in the root folder of your source.
 
-`docker-windows-volume watcher -container=[name of the container your volume is mounted in]`
+`docker-windows-volume-watcher -container=[name of the container your volume is mounted in]`
