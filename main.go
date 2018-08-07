@@ -58,6 +58,7 @@ func notifyDocker(event fsnotify.Event) {
 
 	perms, err := strconv.Atoi(strings.TrimSuffix(string(result), "\n"))
 	if err != nil {
+		fmt.Println("Raw permissions: ", result)
 		fmt.Println("Failed to convert permissions: ", err)
 		return
 	}
