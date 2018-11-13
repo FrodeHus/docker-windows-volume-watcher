@@ -14,17 +14,23 @@ import (
 
 var watcher *fsnotify.Watcher
 var container string
+var rootPath string
 
 func init() {
-	flag.StringVar(&container, "container", "radix-web-dev_container", "Name of the container instance that you wish to notify of filesystem changes")
+	flag.StringVar(&container, "container", "", "Name of the container instance that you wish to notify of filesystem changes")
+	flag.StringVar(&rootPath, "path", "", "Root path where to watch for changes")
 }
 
 func main() {
 	flag.Parse()
 	watcher, _ = fsnotify.NewWatcher()
-	defer watcher.Close()
 
-	if err := filepath.Walk(".", watchDir); err != nil {
+	defer watcher.Close()
+	if rootPath == "" {
+		rootPath = "."
+	}
+
+	if err := filepath.Walk(rootPath, watchDir); err != nil {
 		fmt.Println("ERROR", err)
 	}
 
@@ -55,6 +61,9 @@ func notifyDocker(event fsnotify.Event) {
 	fmt.Println(fmt.Sprintf("%s: %s", event.Op, file))
 
 	result, err := exec.Command("docker", "exec", container, "stat", "-c", "%a", file).Output()
+	if err != nil {
+		fmt.Println("Error retrieving file permissions: ", err)
+	}
 
 	perms, err := strconv.Atoi(strings.TrimSuffix(string(result), "\n"))
 	if err != nil {
