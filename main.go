@@ -58,9 +58,13 @@ func notifyDocker(event fsnotify.Event) {
 	}
 	file := filepath.ToSlash(event.Name)
 
-	fmt.Println(fmt.Sprintf("%s: %s", event.Op, file))
+	containerPath := strings.TrimPrefix(file, rootPath)
+	if strings.HasPrefix(containerPath, "/") {
+		containerPath = strings.TrimPrefix(containerPath, "/")
+	}
+	fmt.Println("Updating container file ", containerPath)
 
-	result, err := exec.Command("docker", "exec", container, "stat", "-c", "%a", file).Output()
+	result, err := exec.Command("docker", "exec", container, "stat", "-c", "%a", containerPath).Output()
 	if err != nil {
 		fmt.Println("Error retrieving file permissions: ", err)
 	}
@@ -71,7 +75,8 @@ func notifyDocker(event fsnotify.Event) {
 		fmt.Println("Failed to convert permissions: ", err)
 		return
 	}
-	_, err = exec.Command("docker", "exec", container, "/bin/sh", "-c", fmt.Sprintf("chmod %d %s", perms, file)).Output()
+
+	_, err = exec.Command("docker", "exec", container, "/bin/sh", "-c", fmt.Sprintf("chmod %d %s", perms, containerPath)).Output()
 	if err != nil {
 		fmt.Printf("Error notifying container about file change: %v", err)
 	}
