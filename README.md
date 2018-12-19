@@ -8,3 +8,7 @@ _Usage_:
 Run this tool in the root folder of your source.
 
 `docker-windows-volume-watcher -container=[name of the container your volume is mounted in]`
+
+You can also specify the path to watch:
+
+`docker-windows-volume-watcher -container=[container name] -path=[path to watch]`
