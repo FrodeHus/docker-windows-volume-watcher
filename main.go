@@ -83,7 +83,7 @@ func notifyDocker(event fsnotify.Event) {
 
 	_, err := exec.Command("docker", "exec", container, "/bin/sh", "-c", fmt.Sprintf("chmod $(stat -c %%a %s) %s", containerPath, containerPath)).Output()
 	if err != nil {
-		fmt.Printf("Error notifying container about file change: %v", err)
+		fmt.Printf("Error notifying container about file change: %v\n", err)
 	}
 }
 
