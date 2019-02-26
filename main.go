@@ -47,6 +47,7 @@ func main() {
 		fmt.Println("ERROR", err)
 	}
 
+	// Map of filenames we're currently notifying about.
 	var processes sync.Map
 
 	for {
@@ -54,11 +55,11 @@ func main() {
 		case event := <-watcher.Events:
 			switch event.Op {
 			case fsnotify.Write:
-				fmt.Println(time.Now())
 				if _, ok := processes.Load(event.Name); ok {
 					continue
 				}
 				processes.Store(event.Name, nil)
+
 				go func(event fsnotify.Event) {
 					defer processes.Delete(event.Name)
 
@@ -73,6 +74,7 @@ func main() {
 
 					notifyDocker(event)
 				}(event)
+
 			case fsnotify.Rename, fsnotify.Remove:
 				processes.Delete(event.Name)
 			}
