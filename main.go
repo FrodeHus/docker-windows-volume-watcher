@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/fsnotify/fsnotify"
@@ -74,19 +73,7 @@ func notifyDocker(event fsnotify.Event) {
 	}
 	fmt.Println("Updating container file ", containerPath)
 
-	result, err := exec.Command("docker", "exec", container, "stat", "-c", "%a", containerPath).Output()
-	if err != nil {
-		fmt.Println("Error retrieving file permissions: ", err)
-	}
-
-	perms, err := strconv.Atoi(strings.TrimSuffix(string(result), "\n"))
-	if err != nil {
-		fmt.Println("Raw permissions: ", result)
-		fmt.Println("Failed to convert permissions: ", err)
-		return
-	}
-
-	_, err = exec.Command("docker", "exec", container, "/bin/sh", "-c", fmt.Sprintf("chmod %d %s", perms, containerPath)).Output()
+	_, err := exec.Command("docker", "exec", container, "/bin/sh", "-c", fmt.Sprintf("chmod $(stat -c %%a %s) %s", containerPath, containerPath)).Output()
 	if err != nil {
 		fmt.Printf("Error notifying container about file change: %v", err)
 	}
