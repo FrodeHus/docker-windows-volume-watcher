@@ -7,6 +7,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/fsnotify/fsnotify"
 )
@@ -16,6 +18,7 @@ var watcher *fsnotify.Watcher
 var (
 	container string
 	rootPath  string
+	delay     int
 
 	ignoreArg string
 	ignores   []string
@@ -24,6 +27,7 @@ var (
 func init() {
 	flag.StringVar(&container, "container", "", "Name of the container instance that you wish to notify of filesystem changes")
 	flag.StringVar(&rootPath, "path", "", "Root path where to watch for changes")
+	flag.IntVar(&delay, "delay", 100, "Delay in milliseconds before notifying about a file that's changed")
 	flag.StringVar(&ignoreArg, "ignore", "node_modules;vendor", "Semicolon-separated list of directories to ignore. "+
 		"Glob expressions are supported.")
 }
@@ -43,22 +47,26 @@ func main() {
 		fmt.Println("ERROR", err)
 	}
 
-	done := make(chan bool)
+	var processes sync.Map
 
-	go func() {
-		for {
-			select {
-			case event := <-watcher.Events:
-				if event.Op == fsnotify.Write {
-					notifyDocker(event)
+	for {
+		select {
+		case event := <-watcher.Events:
+			if event.Op == fsnotify.Write {
+				if _, ok := processes.Load(event.Name); ok {
+					continue
 				}
-			case err := <-watcher.Errors:
-				fmt.Println("Error: ", err)
+				processes.Store(event.Name, nil)
+				go func(event fsnotify.Event) {
+					defer processes.Delete(event.Name)
+					time.Sleep(time.Duration(delay) * time.Millisecond)
+					notifyDocker(event)
+				}(event)
 			}
+		case err := <-watcher.Errors:
+			fmt.Println("Error: ", err)
 		}
-	}()
-
-	<-done
+	}
 }
 
 func notifyDocker(event fsnotify.Event) {
