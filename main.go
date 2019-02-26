@@ -52,16 +52,29 @@ func main() {
 	for {
 		select {
 		case event := <-watcher.Events:
-			if event.Op == fsnotify.Write {
+			switch event.Op {
+			case fsnotify.Write:
+				fmt.Println(time.Now())
 				if _, ok := processes.Load(event.Name); ok {
 					continue
 				}
 				processes.Store(event.Name, nil)
 				go func(event fsnotify.Event) {
 					defer processes.Delete(event.Name)
+
+					// Wait for further events to accomodate the way editors
+					// save files.
 					time.Sleep(time.Duration(delay) * time.Millisecond)
+
+					// Ensure the file hasn't been renamed or removed.
+					if _, ok := processes.Load(event.Name); !ok {
+						return
+					}
+
 					notifyDocker(event)
 				}(event)
+			case fsnotify.Rename, fsnotify.Remove:
+				processes.Delete(event.Name)
 			}
 		case err := <-watcher.Errors:
 			fmt.Println("Error: ", err)
@@ -79,7 +92,7 @@ func notifyDocker(event fsnotify.Event) {
 	if strings.HasPrefix(containerPath, "/") {
 		containerPath = strings.TrimPrefix(containerPath, "/")
 	}
-	fmt.Println("Updating container file ", containerPath)
+	fmt.Println("Updating container file", containerPath)
 
 	_, err := exec.Command("docker", "exec", container, "/bin/sh", "-c", fmt.Sprintf("chmod $(stat -c %%a %s) %s", containerPath, containerPath)).Output()
 	if err != nil {
