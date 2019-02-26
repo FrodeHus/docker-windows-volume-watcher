@@ -13,18 +13,28 @@ import (
 )
 
 var watcher *fsnotify.Watcher
-var container string
-var rootPath string
+
+var (
+	container string
+	rootPath  string
+
+	ignoreArg string
+	ignores   []string
+)
 
 func init() {
 	flag.StringVar(&container, "container", "", "Name of the container instance that you wish to notify of filesystem changes")
 	flag.StringVar(&rootPath, "path", "", "Root path where to watch for changes")
+	flag.StringVar(&ignoreArg, "ignore", ".git;node_modules;vendor", "Semicolon-separated list of directories to ignore. "+
+		"Glob expressions are supported.")
 }
 
 func main() {
 	flag.Parse()
-	watcher, _ = fsnotify.NewWatcher()
 
+	ignores = strings.Split(ignoreArg, ";")
+
+	watcher, _ = fsnotify.NewWatcher()
 	defer watcher.Close()
 	if rootPath == "" {
 		rootPath = "."
@@ -83,9 +93,22 @@ func notifyDocker(event fsnotify.Event) {
 }
 
 func watchDir(path string, fi os.FileInfo, err error) error {
-	if fi.Mode().IsDir() && !(strings.HasPrefix(path, ".") || strings.Contains(path, "node_modules")) {
-		fmt.Println("Watching ", path)
-		return watcher.Add(path)
+	if !fi.Mode().IsDir() {
+		return nil
 	}
-	return nil
+	if len(path) > 1 && strings.HasPrefix(path, ".") {
+		// Ignore hidden directories.
+		return nil
+	}
+	for _, pattern := range ignores {
+		ok, err := filepath.Match(pattern, fi.Name())
+		if err != nil {
+			return err
+		}
+		if ok {
+			return nil
+		}
+	}
+	fmt.Println("Watching ", path)
+	return watcher.Add(path)
 }
